@@ -14,11 +14,12 @@
 PORT=33000
 AS_SERVER_PPID=0
 
-mkdir -p etc/$$
+ETC_DIR=${HOME}/aerospike/etc/$$
+mkdir -p ${ETC_DIR}
 
 run_server()
 {
-    cat <<EOF > etc/$$/aerospike.conf
+    cat <<EOF > ${ETC_DIR}/aerospike.conf
 
 service {
 	proto-fd-max 15000
@@ -72,14 +73,15 @@ EOF
 
     local proc=$(uname -p)
     # goose sudo for password synchronously before starting asd in the
-    # background
-    sudo ps -p $$ > /dev/null \
-    && sudo ${HOME}/aerospike/aerospike-server/target/Linux-${proc}/bin/asd \
-	 --foreground --config-file etc/$$/aerospike.conf \
-	 1>etc/$$/aerospike.log 2>&1 &
+    # background, be stubborn about sudo getting a password and not
+    # simply timing out.
+    false ; while [ $? -ne 0 ] ; do sudo ps -p $$ > /dev/null ; sleep 1 ; done
+    sudo ${HOME}/aerospike/aerospike-server/target/Linux-${proc}/bin/asd \
+	 --foreground --config-file ${ETC_DIR}/aerospike.conf \
+	 1>${ETC_DIR}/aerospike.log 2>&1 &
     AS_SERVER_PPID=$!
     sleep 1
-    head -1 etc/$$/aerospike.log
+    head -1 ${ETC_DIR}/aerospike.log
 }
 
 # Working ssh agent?
@@ -162,7 +164,7 @@ fi
 
 if [ ${AS_SERVER_PPID} -ne 0 ] ; then
     echo --- building and running c client tests ---
-    ( cd aerospike-client-c ;
+    ( cd ${HOME}/aerospike/aerospike-client-c ;
       make EVENT_LIB=libuv AS_PORT=${PORT} test
     )
 fi
@@ -172,20 +174,20 @@ echo --- clean up ---
 # AS_SERVER_PPID is pid of sudo, the child (asd process) should be killed
 if [ ${AS_SERVER_PPID} -ne 0 ] ; then
     pid=$(ps --no-headers -o pid --ppid ${AS_SERVER_PPID} )
-    [ ${pid} != '' ] && sudo /bin/kill -15 ${pid}
+    [ ${pid} != '' ] && sudo kill -15 ${pid}
     sleep 1
 fi
 
-if [ -f etc/$$/aerospike.log ] ; then
+if [ -f ${ETC_DIR}/aerospike.log ] ; then
     echo --- server log head and tail  ---
     echo ==================================================
-    head -120 etc/$$/aerospike.log | tail +90
+    head -120 ${ETC_DIR}/aerospike.log | tail +90
     echo --------------------------------------------------
-    tail -20 etc/$$/aerospike.log
+    tail -20 ${ETC_DIR}/aerospike.log
     echo ==================================================
 fi
 
-rm -rf etc/$$
+rm -rf ${ETC_DIR}
 
 # if started agent for this script, kill it on the way out
 if [ ${SSH_NOT_OK} -eq 1 ] ; then
