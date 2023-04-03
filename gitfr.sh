@@ -84,6 +84,9 @@ EOF
     head -1 ${ETC_DIR}/aerospike.log
 }
 
+# increase # of fd's
+ulimit -n 15000
+
 # Working ssh agent?
 SSH_NOT_OK=1
 ps -p ${SSH_AGENT_PID} > /dev/null
